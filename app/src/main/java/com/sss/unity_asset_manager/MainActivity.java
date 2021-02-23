@@ -40,8 +40,18 @@ public class MainActivity {
             protected File doInBackground( Void... params ) {
                 File assetDir = null;
                 try {
-                    UnityAssets assets = new UnityAssets( _context, SRC_DIR_PATH );
-                    assetDir = assets.syncAssets( );
+                    UnityAssetsObb.logReceiverMethodName = _logReceiverMethodName;
+                    UnityAssetsObb.receiverObjectName = _receiverObjectName;
+                    UnityAssetsObb assetsObb = new UnityAssetsObb( _context, SRC_DIR_PATH );
+                    if ( assetsObb.exist( ) ) {
+                        assetDir = assetsObb.syncAssets();
+                    }
+                    else {
+                        UnityAssets.logReceiverMethodName = _logReceiverMethodName;
+                        UnityAssets.receiverObjectName = _receiverObjectName;
+                        UnityAssets assetsApk = new UnityAssets( _context, SRC_DIR_PATH );
+                        assetDir = assetsApk.syncAssets( );
+                    }
                 } catch ( IOException e ) {
                     copyingResult( EMPTY_DIR_PATH );
                     return null;

@@ -1,6 +1,10 @@
 package com.sss.unity_asset_manager;
 
+import android.app.ActivityManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.os.Environment;
 import android.util.Log;
@@ -29,9 +33,9 @@ import java.util.Map;
  * Класс предназначен для переноса файлов unity streaming assets
  * из apk во "внешнее" хранилище телефона
  */
-public class UnityAssets {
+public class UnityAssetsObb {
 
-    protected static final String TAG = UnityAssets.class.getSimpleName( );
+    protected static final String TAG = UnityAssetsObb.class.getSimpleName( );
     /**
      * файл с перечнем извлекаемых файлов
      */
@@ -49,7 +53,26 @@ public class UnityAssets {
      */
     private String _targerDir;
 
-    public UnityAssets( Context context ) throws IOException {
+    public String getAppPackageName( Context context ) {
+        ActivityManager activityManager = (ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningTaskInfo> taskInfo = activityManager.getRunningTasks(1);
+        ComponentName componentInfo = taskInfo.get(0).topActivity;
+        return componentInfo.getPackageName( );
+    }
+
+    public int getVersionCode( Context context ) {
+        try {
+            PackageManager packageManager = context.getPackageManager( );
+            PackageInfo packageInfo = packageManager.getPackageInfo(
+                    context.getPackageName(), 0 );
+            return ((PackageInfo) packageInfo).versionCode;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public UnityAssetsObb( Context context ) throws IOException {
         File appDir = context.getExternalFilesDir( (String)null );
         if( null == appDir ) {
             throw new IOException( "cannot get external files dir, external storage state is " + Environment.getExternalStorageState( ) );
@@ -60,17 +83,29 @@ public class UnityAssets {
         }
     }
 
-    public UnityAssets(Context context, String dest ) throws IOException {
-        File appDir = context.getExternalFilesDir( (String)null );
-        _targerDir = dest;
-        //UnityPlayer.UnitySendMessage( receiverObjectName, logReceiverMethodName, "UnityAssets constructor");
-        if( null == appDir ) {
-            throw new IOException( "cannot get external files dir, external storage state is " + Environment.getExternalStorageState( ) );
+    public UnityAssetsObb(Context context, String dest ) throws IOException {
+        String path = context.getObbDir( ).getPath( ) + "/main." + getVersionCode( context ) + "." + getAppPackageName( context ) + ".obb";
+        File fObb = new File( path );
+        _exist = fObb.exists( );
+        if ( _exist ) {
+            _obbContainer = new ZipResourceFile(path);
+        }
+        File appDir = context.getExternalFilesDir((String) null);
+        _targerDir = "assets/" + dest;
+        if (null == appDir) {
+            throw new IOException("cannot get external files dir, external storage state is " + Environment.getExternalStorageState());
         } else {
-            this.externalDir = new File( appDir, _targerDir );
-            this.assetManager = context.getAssets( );
+            this.externalDir = new File(appDir, _targerDir);
+            this.assetManager = context.getAssets();
         }
     }
+
+    public boolean exist( ) {
+        return _exist;
+    }
+    private boolean _exist = true;
+
+    ZipResourceFile _obbContainer;
 
     public File getExternalDir( ) {
         return this.externalDir;
@@ -104,7 +139,7 @@ public class UnityAssets {
         }
     }
 
-    private List<String> readLines(InputStream source ) throws IOException {
+    private List<String> readLines( InputStream source ) throws IOException {
         ArrayList lines = new ArrayList( );
         BufferedReader br = new BufferedReader( new InputStreamReader( source ) );
         String line;
@@ -115,7 +150,9 @@ public class UnityAssets {
     }
 
     private InputStream openAsset(String asset ) throws IOException {
-        return this.assetManager.open( ( new File( _targerDir, asset ) ).getPath( ) );
+        InputStream is = this._obbContainer.getInputStream( ( new File( _targerDir, asset ) ).getPath( ) );
+        //UnityPlayer.UnitySendMessage( receiverObjectName, logReceiverMethodName, Integer.toString(is.available( )) );
+        return is;
     }
 
     public void updateItemList( Map<String, String> items ) throws IOException {
@@ -129,7 +166,7 @@ public class UnityAssets {
         pw.close( );
     }
 
-    public File copy(String asset ) throws IOException {
+    public File copy( String asset ) throws IOException {
         InputStream source = this.openAsset( asset );
         File destinationFile = new File( this.externalDir, asset );
         destinationFile.getParentFile( ).mkdirs( );
@@ -159,6 +196,7 @@ public class UnityAssets {
         Map items = this.getItems( );
         Map externalItems = this.getExternalItems( );
         Iterator i$ = items.keySet( ).iterator( );
+
         while( true ) {
             String path;
             while( i$.hasNext( ) ) {
